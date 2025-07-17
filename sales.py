@@ -37,7 +37,7 @@ class salesClass:
         sales_Frame.place(x=50, y=140, width=200, height=330)
 
         scrolly = Scrollbar(sales_Frame, orient=VERTICAL)
-        self.sales_list = Listbox(sales_Frame, font=("times new roman", 15), bg="white", yscrollcommand=scrolly.set)
+        self.sales_list = Listbox(sales_Frame, bg="white", yscrollcommand=scrolly.set)
         scrolly.pack(side=RIGHT, fill=Y)
         scrolly.config(command=self.sales_list.yview)
         self.sales_list.pack(fill=BOTH, expand=1)

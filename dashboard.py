@@ -6,6 +6,7 @@ from category import categoryClass
 from product import productClass
 from sales import salesClass
 from datetime import datetime  # Import datetime module
+from tkinter import messagebox
 
 class SMS:
     def __init__(self, root):
@@ -22,7 +23,7 @@ class SMS:
 
         # Logout Button
         btn_logout = Button(self.root, text="Logout", font=("times new roman", 20, "bold"),
-                            bg="#000080", fg="white", cursor="hand2")
+                            bg="#000080", fg="white", cursor="hand2", command=self.logout)
         btn_logout.place(x=1150, y=10, height=50, width=150)
        
         # Clock
@@ -88,11 +89,17 @@ class SMS:
         self.lbl_developer = Label(self.root, text="Developer\n[0]", bd=5, relief=RIDGE,
                                    bg="#87CEEB", fg="#000080", font=("goudy old style", 20, "bold"))
         self.lbl_developer.place(x=1000, y=300, height=150, width=300)
+
+        # Add Employee button (only visible to admin, but for now always visible)
+        btn_add_emp = Button(self.root, text='Add Employee', font=("times new roman", 16, "bold"), bg="#4caf50", fg="white", command=self.add_employee_window)
+        btn_add_emp.place(x=1100, y=500, width=180, height=50)
         
         # Footer
         lbl_footer = Label(self.root, text="SMS-Stock Management System | Developed By: Pankaj Kumar\nIf You are facing any type of technical error then contact us! - Email-mackystech@gmail.com; Mobile: +91-82359-10315",
                            font=("times new roman", 12), bg="#000080", fg="white")
         lbl_footer.pack(side=BOTTOM, fill=X)
+
+        self.update_dashboard_counts()  # Start real-time dashboard updates
     
     def update_clock(self):
         now = datetime.now()
@@ -122,6 +129,54 @@ class SMS:
     
     def exit_app(self):
         self.root.destroy()
+
+    def update_dashboard_counts(self):
+        import sqlite3
+        try:
+            con = sqlite3.connect('sms.db')
+            cur = con.cursor()
+            cur.execute('SELECT COUNT(*) FROM employee')
+            emp_count = cur.fetchone()[0]
+            cur.execute('SELECT COUNT(*) FROM supplier')
+            sup_count = cur.fetchone()[0]
+            cur.execute('SELECT COUNT(*) FROM category')
+            cat_count = cur.fetchone()[0]
+            cur.execute('SELECT COUNT(*) FROM product')
+            prod_count = cur.fetchone()[0]
+            # For sales, count files in bill/ directory
+            import os
+            sales_count = 0
+            if os.path.exists('bill'):
+                sales_count = len([f for f in os.listdir('bill') if f.endswith('.txt')])
+            # Developer count is static (set to 1 or 0)
+            dev_count = 1
+            self.lbl_employee.config(text=f"Total Employee\n[{emp_count}]")
+            self.lbl_supplier.config(text=f"Total Supplier\n[{sup_count}]")
+            self.lbl_category.config(text=f"Total Category\n[{cat_count}]")
+            self.lbl_product.config(text=f"Total Product\n[{prod_count}]")
+            self.lbl_sales.config(text=f"Total Sales\n[{sales_count}]")
+            self.lbl_developer.config(text=f"Developer\n[{dev_count}]")
+            con.close()
+        except Exception as ex:
+            # Optionally, show error or log
+            pass
+        self.root.after(3000, self.update_dashboard_counts)  # Update every 3 seconds
+
+    def add_employee_window(self):
+        from employee import employeeClass
+        win = Toplevel(self.root)
+        win.title('Employee Management')
+        win.geometry('1100x500+220+130')
+        win.config(bg='white')
+        employeeClass(win)
+
+    def logout(self):
+        self.root.destroy()
+        import login
+        import tkinter as tk
+        root = tk.Tk()
+        login.LoginWindow(root)
+        root.mainloop()
 
 if __name__ == "__main__":
     root = Tk()

@@ -15,11 +15,13 @@ class BillClass:
         title=Label(self.root,text="TITE Stock Management System",image=self.icon_title,compound=LEFT, font=("times new roman",40,"bold"),bg="#ff0000",fg="white",anchor="w",padx=20).place(x=0,y=0,relwidth=1,height=70)
         
         #button-Logout
-        btn_logout=Button(self.root,text="Logout",font=("times new roman",20,"bold"),bg="#000080",fg="white",cursor="hand2").place(x=1150,y=10,height=50,width=150)
+        btn_logout=Button(self.root,text="Logout",font=("times new roman",20,"bold"),bg="#000080",fg="white",cursor="hand2", command=self.logout)
+        btn_logout.place(x=1150,y=10,height=50,width=150)
        
         #clock
         self.lbl_clock=Label(self.root,text="Welcome to Stock Management System\t\t Date: DD-MM-YYYY\t\t Time: HH:MM:SS",font=("times new roman",15),bg="#000080",fg="white")
         self.lbl_clock.place(x=0,y=70,relwidth=1,height=30)
+        self.update_clock()
         
         
         #Product Frame
@@ -214,13 +216,13 @@ class BillClass:
         self.lbl_menu_btn2=Label(billMenuFrame,text='Net Pay\n[0]',font=("goudy old style",15,"bold"),bg="#607d8b",fg="white")
         self.lbl_menu_btn2.place(x=246,y=5,width=150,height=70)
         
-        menu_btn=Button(billMenuFrame,text='Print',cursor='hand2',font=("goudy old style",15,"bold"),bg="#3f51b5",fg="white")
+        menu_btn=Button(billMenuFrame,text='Print',cursor='hand2',font=("goudy old style",15,"bold"),bg="#3f51b5",fg="white", command=self.print_bill)
         menu_btn.place(x=2,y=80,width=120,height=50)
         
-        menu_btn1=Button(billMenuFrame,text='Clear All',cursor='hand2',font=("goudy old style",15,"bold"),bg="#8bc34a",fg="white")
+        menu_btn1=Button(billMenuFrame,text='Clear All',cursor='hand2',font=("goudy old style",15,"bold"),bg="#8bc34a",fg="white", command=self.clear_all)
         menu_btn1.place(x=124,y=80,width=120,height=50)
         
-        menu_btn2=Button(billMenuFrame,text='Generate/Save Bill',cursor='hand2',font=("goudy old style",12,"bold"),bg="#607d8b",fg="white")
+        menu_btn2=Button(billMenuFrame,text='Generate/Save Bill',cursor='hand2',font=("goudy old style",12,"bold"),bg="#607d8b",fg="white", command=self.generate_bill)
         menu_btn2.place(x=246,y=80,width=150,height=50)
         
         #footer
@@ -347,6 +349,100 @@ class BillClass:
             self.var_search.set('')
         except Exception as ex:
             messagebox.showerror("Error",f"Error due to :{str(ex)}",parent=self.root)
+
+    def generate_bill(self):
+        if self.var_cname.get() == '' or self.var_contact.get() == '':
+            messagebox.showerror("Error", "Customer details are required", parent=self.root)
+            return
+        if len(self.cart_list) == 0:
+            messagebox.showerror("Error", "Cart is empty!", parent=self.root)
+            return
+        self.txt_bill_area.delete('1.0', END)
+        bill_num = f"BILL{self.var_contact.get()}"
+        bill_header = f"\tTITE Stock Management System\n"
+        bill_header += f"\tPhone No. : +91-82359-10315\n"
+        bill_header += f"{'='*47}\n"
+        bill_header += f"Customer Name: {self.var_cname.get()}\n"
+        bill_header += f"Contact No. : {self.var_contact.get()}\n"
+        bill_header += f"{'='*47}\n"
+        bill_header += f"PID\tName\tQty\tPrice\n"
+        bill_header += f"{'-'*47}\n"
+        self.txt_bill_area.insert(END, bill_header)
+        total = 0
+        for item in self.cart_list:
+            self.txt_bill_area.insert(END, f"{item[0]}\t{item[1]}\t{item[3]}\t{item[2]}\n")
+            total += float(item[2])
+        discount = (total * 10) / 100
+        net_pay = total - discount
+        bill_footer = f"{'='*47}\n"
+        bill_footer += f"Bill Amount: {total}\n"
+        bill_footer += f"Discount: {discount}\n"
+        bill_footer += f"Net Pay: {net_pay}\n"
+        bill_footer += f"{'='*47}\n"
+        self.txt_bill_area.insert(END, bill_footer)
+        # Save bill to file
+        try:
+            with open(f"bill/{bill_num}.txt", "w") as f:
+                f.write(self.txt_bill_area.get('1.0', END))
+            messagebox.showinfo("Saved", f"Bill No. {bill_num} saved successfully!", parent=self.root)
+            # Update product quantities in database
+            con = sqlite3.connect(database=r'sms.db')
+            cur = con.cursor()
+            for item in self.cart_list:
+                pid = item[0]
+                qty_purchased = int(item[3])
+                cur.execute("SELECT qty FROM product WHERE pid=?", (pid,))
+                result = cur.fetchone()
+                if result:
+                    current_qty = int(result[0])
+                    new_qty = current_qty - qty_purchased
+                    status = 'Active' if new_qty > 0 else 'Inactive'
+                    cur.execute("UPDATE product SET qty=?, status=? WHERE pid=?", (new_qty, status, pid))
+            con.commit()
+            con.close()
+            self.show()  # Refresh product list
+        except Exception as ex:
+            messagebox.showerror("Error", f"Failed to save bill: {str(ex)}", parent=self.root)
+
+    def print_bill(self):
+        import tempfile
+        import os
+        import subprocess
+        bill_content = self.txt_bill_area.get('1.0', 'end')
+        if not bill_content.strip():
+            messagebox.showerror("Error", "No bill to print!", parent=self.root)
+            return
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.txt', mode='w', encoding='utf-8') as f:
+                f.write(bill_content)
+                temp_path = f.name
+            # Use Notepad's print command
+            subprocess.run(['notepad.exe', '/p', temp_path], check=True)
+        except Exception as ex:
+            messagebox.showerror("Error", f"Failed to print bill: {str(ex)}", parent=self.root)
+
+    def clear_all(self):
+        self.var_cname.set('')
+        self.var_contact.set('')
+        self.cart_list.clear()
+        self.show_cart()
+        self.txt_bill_area.delete('1.0', END)
+        self.lbl_menu_btn.config(text=f"Bill Amount\n[0]")
+        self.lbl_menu_btn1.config(text=f"Discount\n[10%]")
+        self.lbl_menu_btn2.config(text=f"Net Pay\n[0]")
+        self.cartTitle.config(text=f"Cart \t Total Products:[0]")
+
+    def update_clock(self):
+        import time
+        import datetime
+        now = datetime.datetime.now()
+        date_str = now.strftime('%d-%m-%Y')
+        time_str = now.strftime('%H:%M:%S')
+        self.lbl_clock.config(text=f"Welcome to Stock Management System\t\t Date: {date_str}\t\t Time: {time_str}")
+        self.root.after(1000, self.update_clock)
+
+    def logout(self):
+        self.root.destroy()
 
         
 
